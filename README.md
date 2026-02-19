@@ -4,6 +4,10 @@
 ## Details
 Versatile, lightweight system observability
 
+**Server**
+
+**Client**
+
 
 ## Config
 
