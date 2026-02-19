@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Reflex | System Stats</title>
+    <script src="https://cdn.pubnub.com/sdk/javascript/pubnub.7.2.2.min.js"></script>
+    <style>
+        :root {
+            --navy:  #162354;   /* Reflex dark blue  */
+            --cyan:  #00b5cc;   /* Observer teal     */
+            --cyan2: #009ab0;   /* cyan hover        */
+            --green: #2ecc71;
+            --red:   #e74c3c;
+            --warn:  #f39c12;
+            --gray:  #c5cfe0;
+            --dark:  #1a2540;
+            --muted: #5a6a8a;
+            --bg:    #e6eef6;
+            --card:  #ffffff;
+            --border:#d0dcea;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--dark);
+            padding: 0;
+        }
+
+        /* ── Top nav bar ── */
+        .topbar {
+            background: linear-gradient(135deg, var(--navy) 0%, #1e3270 100%);
+            padding: 14px 32px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 12px rgba(22,35,84,0.3);
+        }
+        .brand {
+            display: flex; align-items: center; gap: 14px;
+        }
+        .brand img {
+            width: 52px; height: 52px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .brand-text h1 {
+            font-size: 1.3rem; font-weight: 800;
+            color: white; letter-spacing: -0.3px;
+        }
+        .brand-text h1 span { color: var(--cyan); }
+        .brand-text p {
+            font-size: 11px; color: rgba(255,255,255,0.55);
+            letter-spacing: 0.5px; margin-top: 2px;
+        }
+
+        .topbar-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+        #upload-btn {
+            font-size: 12px; font-weight: 700; cursor: pointer;
+            padding: 7px 16px; border-radius: 20px;
+            background: var(--cyan); color: white;
+            border: none; transition: background 0.2s;
+        }
+        #upload-btn:hover { background: var(--cyan2); }
+        #upload-status {
+            font-size: 11px; color: rgba(255,255,255,0.55);
+            min-height: 14px; text-align: right;
+        }
+        #upload-status.success { color: var(--green); }
+        #upload-status.error   { color: var(--red);   }
+        #status-badge {
+            font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+            padding: 5px 13px; border-radius: 20px;
+            background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.7);
+        }
+        #status-badge.connected { background: rgba(46,204,113,0.2); color: var(--green); }
+
+        /* ── Page body ── */
+        .page { padding: 28px 32px; }
+
+        /* ── Device grid ── */
+        .device-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+        }
+
+        /* ── Card ── */
+        .card {
+            background: var(--card); border-radius: 14px;
+            border-top: 5px solid var(--gray);
+            padding: 22px;
+            box-shadow: 0 2px 12px rgba(22,35,84,0.08);
+            transition: border-color 0.4s, box-shadow 0.3s;
+        }
+        .card.online  { border-top-color: var(--green); box-shadow: 0 2px 16px rgba(22,35,84,0.1); }
+        .card.offline { border-top-color: var(--red);   }
+        .card.editing { border-top-color: var(--cyan);  }
+
+        .card-header {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            margin-bottom: 18px;
+        }
+        .device-name { font-size: 1.05rem; font-weight: 800; color: var(--navy); }
+
+        .card-actions { display: flex; gap: 8px; align-items: center; }
+        .edit-btn {
+            font-size: 11px; font-weight: 700; cursor: pointer;
+            padding: 3px 10px; border-radius: 12px;
+            background: #eef2f8; color: var(--muted);
+            border: 1px solid var(--border); transition: all 0.2s;
+        }
+        .edit-btn:hover { background: var(--cyan); color: white; border-color: var(--cyan); }
+
+        .pill {
+            font-size: 10px; font-weight: 900; letter-spacing: 1px;
+            padding: 3px 9px; border-radius: 12px;
+        }
+        .pill.online  { background: #d4f6e6; color: #1a7a42; }
+        .pill.offline { background: #fde8e8; color: #b03030; }
+        .pill.editing { background: #d6f3f8; color: #006f85; }
+
+        /* ── Stat rows ── */
+        .stat { margin-bottom: 14px; }
+        .stat:last-child { margin-bottom: 0; }
+
+        .stat-header {
+            display: flex; justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        .stat-name  { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+        .stat-value { font-size: 13px; font-weight: 700; color: var(--navy); }
+
+        .bar-track {
+            height: 5px; background: #e0e8f0; border-radius: 3px; overflow: hidden;
+        }
+        .bar-fill {
+            height: 100%; border-radius: 3px;
+            background: var(--cyan);
+            transition: width 0.6s ease, background 0.4s;
+        }
+        .bar-fill.warn   { background: var(--warn); }
+        .bar-fill.danger { background: var(--red);  }
+
+        .stat-raw {
+            font-size: 12px; color: var(--muted);
+            padding: 4px 0; border-bottom: 1px dashed #dce6f0;
+        }
+
+        .last-seen {
+            margin-top: 16px; padding-top: 10px;
+            border-top: 1px solid #e8eef6;
+            font-size: 11px; color: var(--muted); text-align: right;
+        }
+
+        /* ── Ignored section ── */
+        .ignored-section {
+            margin-top: 14px; padding-top: 10px;
+            border-top: 1px dashed #dce6f0;
+            display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+        }
+        .ignored-label {
+            font-size: 11px; color: var(--muted); text-transform: uppercase;
+            letter-spacing: 0.5px; margin-right: 2px;
+        }
+        .reactivate-link {
+            font-size: 11px; font-weight: 700;
+            color: var(--cyan2); text-decoration: none;
+            padding: 2px 9px; border-radius: 10px;
+            background: #d6f3f8;
+            transition: background 0.2s;
+        }
+        .reactivate-link:hover { background: #a8e6f0; }
+
+        /* ── Edit panel ── */
+        .edit-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 8px 0; border-bottom: 1px solid #eef2f8;
+            font-size: 13px; cursor: pointer;
+        }
+        .edit-item:last-of-type { border-bottom: none; }
+        .edit-item input[type="checkbox"] {
+            width: 16px; height: 16px; cursor: pointer;
+            accent-color: var(--cyan);
+        }
+        .edit-item label { cursor: pointer; font-weight: 600; color: var(--navy); letter-spacing: 0.5px; }
+        .edit-actions {
+            display: flex; gap: 8px; margin-top: 16px; padding-top: 12px;
+            border-top: 1px solid #e8eef6;
+        }
+        .save-btn {
+            flex: 1; padding: 8px; border-radius: 8px; border: none;
+            background: var(--cyan); color: white;
+            font-weight: 700; font-size: 13px; cursor: pointer;
+        }
+        .save-btn:hover { background: var(--cyan2); }
+        .cancel-btn {
+            flex: 1; padding: 8px; border-radius: 8px;
+            border: 1px solid var(--border); background: white;
+            font-weight: 700; font-size: 13px; cursor: pointer; color: var(--muted);
+        }
+        .cancel-btn:hover { background: #eef2f8; }
+
+        /* ── Empty / waiting ── */
+        .waiting { color: var(--muted); font-size: 13px; font-style: italic; }
+
+        #empty {
+            text-align: center; padding: 80px;
+            color: var(--muted); display: none;
+        }
+
+        /* ── View toggle ── */
+        .view-controls {
+            display: flex; align-items: center; gap: 6px;
+            margin-bottom: 20px;
+        }
+        .view-btn {
+            font-size: 12px; font-weight: 700; cursor: pointer;
+            padding: 5px 14px; border-radius: 20px;
+            border: 1.5px solid var(--border);
+            background: white; color: var(--muted);
+            transition: all 0.2s;
+        }
+        .view-btn.active { background: var(--navy); color: white; border-color: var(--navy); }
+        .view-btn:not(.active):hover { background: #eef2f8; }
+
+        /* ── List mode ── */
+        .list-grid { display: flex; flex-direction: column; gap: 6px; }
+
+        .list-row {
+            background: var(--card); border-radius: 10px;
+            border-left: 5px solid var(--gray);
+            display: flex; flex-direction: column;
+            box-shadow: 0 1px 4px rgba(22,35,84,0.07);
+            transition: border-color 0.4s, box-shadow 0.2s;
+            overflow: hidden;
+        }
+        .list-row.online  { border-left-color: var(--green); }
+        .list-row.offline { border-left-color: var(--red);   }
+        .list-row.editing { border-left-color: var(--cyan);  }
+
+        .list-summary {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 16px; cursor: pointer; user-select: none;
+        }
+        .list-summary:hover { background: #f5f8fc; }
+        .list-hostname { font-size: 13px; font-weight: 800; color: var(--navy); flex: 1; }
+        .list-actions  { display: flex; align-items: center; gap: 8px; }
+
+        .list-detail {
+            padding: 14px 16px;
+            border-top: 1px solid var(--border);
+        }
+    </style>
+</head>
+<body>
+
+<div class="topbar">
+    <div class="brand">
+        <img src="/images/5_Gemini_Generated_Image_e6w7tfe6w7tfe6w7.png" alt="Reflex Observer">
+        <div class="brand-text">
+            <h1>Reflex <span>Observer</span></h1>
+            <p>LIVE SYSTEM METRICS</p>
+        </div>
+    </div>
+    <div class="topbar-right">
+        <input type="file" id="file-input" accept=".py" style="display:none">
+        <button id="upload-btn" onclick="document.getElementById('file-input').click()">+ Add Script</button>
+        <div id="upload-status"></div>
+        <div id="status-badge">Initializing...</div>
+    </div>
+</div>
+
+<div class="page">
+    <div class="view-controls">
+        <button id="btn-tile" class="view-btn active" onclick="setView('tile')">&#8862; Tile</button>
+        <button id="btn-list" class="view-btn"        onclick="setView('list')">&#8801; List</button>
+    </div>
+    <div class="device-grid" id="grid"></div>
+    <div id="empty">No devices registered on availability_monitor.</div>
+</div>
+
+<script>
+    const MONITOR_CHANNEL = "availability_monitor";
+    let IGNORE_CHAN = "";
+
+    let pubnub;
+    let viewMode = "tile";
+    // hostname → { stats:{}, lastSeen, ignored: Set, allTests: Set, editing: bool, expanded: bool }
+    let devices = {};
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    function isPercent(value) {
+        const n = parseFloat(value);
+        return !isNaN(n) && n >= 0 && n <= 100;
+    }
+    function barClass(pct) {
+        if (pct >= 90) return "danger";
+        if (pct >= 70) return "warn";
+        return "";
+    }
+    function fmt(value) {
+        const n = parseFloat(value);
+        if (!isNaN(n) && isPercent(value)) return n.toFixed(1) + "%";
+        return value;
+    }
+
+    // ── Stat HTML ─────────────────────────────────────────────────────────────
+
+    function statHtml(name, value) {
+        const pct = parseFloat(value);
+        const hasBar = isPercent(value);
+        return `
+            <div class="stat">
+                <div class="stat-header">
+                    <span class="stat-name">${name}</span>
+                    <span class="stat-value">${fmt(value)}</span>
+                </div>
+                ${hasBar
+                    ? `<div class="bar-track"><div class="bar-fill ${barClass(pct)}" style="width:${pct}%"></div></div>`
+                    : `<div class="stat-raw">${value}</div>`
+                }
+            </div>`;
+    }
+
+    // ── Render ───────────────────────────────────────────────────────────────
+
+    function renderCard(hostname) {
+        const dev = devices[hostname];
+        const online = dev.lastSeen && (Date.now() - dev.lastSeen) < 10000;
+
+        if (viewMode === "list") {
+            renderListRow(hostname, dev, online);
+            return;
+        }
+
+        let card = document.getElementById("card-" + hostname);
+        if (!card) {
+            card = document.createElement("div");
+            card.id = "card-" + hostname;
+            document.getElementById("grid").appendChild(card);
+        }
+
+        if (dev.editing) {
+            card.className = "card editing";
+            card.innerHTML = renderEditMode(hostname, dev);
+        } else {
+            card.className = "card " + (online ? "online" : "offline");
+            card.innerHTML = renderNormal(hostname, dev, online);
+        }
+    }
+
+    function renderListRow(hostname, dev, online) {
+        const statusClass = online ? "online" : "offline";
+        const statusLabel = online ? "ONLINE" : "OFFLINE";
+
+        let row = document.getElementById("card-" + hostname);
+        if (!row) {
+            row = document.createElement("div");
+            row.id = "card-" + hostname;
+            document.getElementById("grid").appendChild(row);
+        }
+
+        if (dev.editing) {
+            const checkboxes = Array.from(dev.allTests).sort().map(test => `
+                <div class="edit-item">
+                    <input type="checkbox" id="chk-${hostname}-${test}"
+                        ${dev.ignored.has(test) ? "" : "checked"}>
+                    <label for="chk-${hostname}-${test}">${test.toUpperCase()}</label>
+                </div>`).join("");
+
+            row.className = "list-row editing";
+            row.innerHTML = `
+                <div class="list-summary">
+                    <span class="list-hostname">${hostname}</span>
+                    <div class="list-actions">
+                        <span class="pill editing">EDITING</span>
+                    </div>
+                </div>
+                <div class="list-detail">
+                    ${checkboxes || '<p class="waiting">No tests recorded yet.</p>'}
+                    <div class="edit-actions">
+                        <button class="save-btn" onclick="saveIgnore('${hostname}')">Save</button>
+                        <button class="cancel-btn" onclick="cancelEdit('${hostname}')">Cancel</button>
+                    </div>
+                </div>`;
+            return;
+        }
+
+        let detailHtml = "";
+        if (dev.expanded) {
+            const activeHtml = Object.entries(dev.stats)
+                .filter(([name]) => !dev.ignored.has(name))
+                .map(([name, value]) => statHtml(name, value))
+                .join("");
+            let ignoredHtml = "";
+            if (dev.ignored.size > 0) {
+                const links = Array.from(dev.ignored).sort().map(test =>
+                    `<a href="#" class="reactivate-link"
+                        onclick="reactivate('${hostname}','${test}');return false;">
+                        ${test.toUpperCase()}
+                    </a>`
+                ).join("");
+                ignoredHtml = `
+                    <div class="ignored-section">
+                        <span class="ignored-label">Disabled:</span>
+                        ${links}
+                    </div>`;
+            }
+            detailHtml = `
+                <div class="list-detail">
+                    ${activeHtml || '<p class="waiting">Awaiting stats...</p>'}
+                    ${ignoredHtml}
+                </div>`;
+        }
+
+        row.className = "list-row " + statusClass;
+        row.innerHTML = `
+            <div class="list-summary" onclick="toggleListExpand('${hostname}')">
+                <span class="list-hostname">${hostname}</span>
+                <div class="list-actions" onclick="event.stopPropagation()">
+                    <button class="edit-btn" onclick="refreshDevice('${hostname}')">&#8635;</button>
+                    <button class="edit-btn" onclick="startEdit('${hostname}')">Edit</button>
+                    <span class="pill ${statusClass}">${statusLabel}</span>
+                </div>
+            </div>
+            ${detailHtml}`;
+    }
+
+    function renderNormal(hostname, dev, online) {
+        const statusClass = online ? "online" : "offline";
+        const statusLabel = online ? "ONLINE" : "OFFLINE";
+
+        // Active stats (not ignored)
+        const activeHtml = Object.entries(dev.stats)
+            .filter(([name]) => !dev.ignored.has(name))
+            .map(([name, value]) => statHtml(name, value))
+            .join("");
+
+        // Ignored tests as reactivation links
+        let ignoredHtml = "";
+        if (dev.ignored.size > 0) {
+            const links = Array.from(dev.ignored).sort().map(test =>
+                `<a href="#" class="reactivate-link"
+                    onclick="reactivate('${hostname}','${test}');return false;">
+                    ${test.toUpperCase()}
+                </a>`
+            ).join("");
+            ignoredHtml = `
+                <div class="ignored-section">
+                    <span class="ignored-label">Disabled:</span>
+                    ${links}
+                </div>`;
+        }
+
+        const lastSeenStr = dev.lastSeen ? new Date(dev.lastSeen).toLocaleTimeString() : "—";
+
+        return `
+            <div class="card-header">
+                <span class="device-name">${hostname}</span>
+                <div class="card-actions">
+                    <button class="edit-btn" onclick="refreshDevice('${hostname}')">&#8635;</button>
+                    <button class="edit-btn" onclick="startEdit('${hostname}')">Edit</button>
+                    <span class="pill ${statusClass}">${statusLabel}</span>
+                </div>
+            </div>
+            ${activeHtml || '<p class="waiting">Awaiting stats...</p>'}
+            ${ignoredHtml}
+            <div class="last-seen">Last update: ${lastSeenStr}</div>`;
+    }
+
+    function renderEditMode(hostname, dev) {
+        const rows = Array.from(dev.allTests).sort().map(test => `
+            <div class="edit-item">
+                <input type="checkbox" id="chk-${hostname}-${test}"
+                    ${dev.ignored.has(test) ? "" : "checked"}>
+                <label for="chk-${hostname}-${test}">${test.toUpperCase()}</label>
+            </div>`).join("");
+
+        return `
+            <div class="card-header">
+                <span class="device-name">${hostname}</span>
+                <span class="pill editing">EDITING</span>
+            </div>
+            <div class="edit-panel">
+                ${rows || '<p class="waiting">No tests recorded yet.</p>'}
+                <div class="edit-actions">
+                    <button class="save-btn" onclick="saveIgnore('${hostname}')">Save</button>
+                    <button class="cancel-btn" onclick="cancelEdit('${hostname}')">Cancel</button>
+                </div>
+            </div>`;
+    }
+
+    function renderAll() {
+        Object.keys(devices).forEach(renderCard);
+    }
+
+    // ── Ignore management ─────────────────────────────────────────────────────
+
+    async function publishIgnore(hostname) {
+        const dev = devices[hostname];
+        const ignoreStr = Array.from(dev.ignored).map(t => t.toUpperCase()).join(", ");
+        try {
+            await pubnub.publish({
+                channel: IGNORE_CHAN,
+                message: { host: hostname, ignore: ignoreStr }
+            });
+        } catch (e) {
+            console.error("publishIgnore error:", e);
+        }
+    }
+
+    function startEdit(hostname) {
+        devices[hostname].editing = true;
+        renderCard(hostname);
+    }
+
+    function cancelEdit(hostname) {
+        devices[hostname].editing = false;
+        renderCard(hostname);
+    }
+
+    function saveIgnore(hostname) {
+        const dev = devices[hostname];
+        const newIgnored = new Set();
+        dev.allTests.forEach(test => {
+            const chk = document.getElementById(`chk-${hostname}-${test}`);
+            if (chk && !chk.checked) newIgnored.add(test);
+        });
+        dev.ignored = newIgnored;
+        dev.editing = false;
+        publishIgnore(hostname);
+        renderCard(hostname);
+    }
+
+    function reactivate(hostname, test) {
+        devices[hostname].ignored.delete(test);
+        publishIgnore(hostname);
+        renderCard(hostname);
+    }
+
+    function toggleListExpand(hostname) {
+        devices[hostname].expanded = !devices[hostname].expanded;
+        renderCard(hostname);
+    }
+
+    function setView(mode) {
+        viewMode = mode;
+        document.getElementById("btn-tile").classList.toggle("active", mode === "tile");
+        document.getElementById("btn-list").classList.toggle("active", mode === "list");
+        const grid = document.getElementById("grid");
+        grid.className = mode === "list" ? "list-grid" : "device-grid";
+        grid.innerHTML = "";
+        renderAll();
+    }
+
+    async function refreshDevice(hostname) {
+        try {
+            await pubnub.publish({
+                channel: IGNORE_CHAN,
+                message: { host: hostname, command: "refresh" }
+            });
+        } catch (e) {
+            console.error("refreshDevice error:", e);
+        }
+    }
+
+    // ── Init ─────────────────────────────────────────────────────────────────
+
+    function updateBadge() {
+        const badge = document.getElementById("status-badge");
+        const count = Object.keys(devices).length;
+        badge.textContent = `Connected · ${count} device(s)`;
+        badge.className = "connected";
+        document.getElementById("empty").style.display = count ? "none" : "block";
+    }
+
+    async function init() {
+        const badge = document.getElementById("status-badge");
+
+        const [configRes, membersRes] = await Promise.all([
+            fetch("/api/config"),
+            fetch("/api/members")
+        ]);
+        const cfg = await configRes.json();
+        const { members } = await membersRes.json();
+
+        IGNORE_CHAN = cfg.ignore_chan;
+
+        // Seed device registry from existing members
+        members.forEach(h => {
+            devices[h] = { stats: {}, lastSeen: null, ignored: new Set(), allTests: new Set(), editing: false, expanded: false };
+        });
+        if (members.length) renderAll();
+        else document.getElementById("empty").style.display = "block";
+
+        // Start PubNub
+        pubnub = new PubNub({ publishKey: cfg.pub, subscribeKey: cfg.sub, userId: "dashboard" });
+
+        pubnub.addListener({
+            message(event) {
+                const hostname = event.channel;
+                const { test, result } = event.message;
+
+                if (!devices[hostname]) {
+                    devices[hostname] = { stats: {}, lastSeen: null, ignored: new Set(), allTests: new Set(), editing: false, expanded: false };
+                }
+                const dev = devices[hostname];
+                dev.lastSeen = Date.now();
+
+                // Ignore-state sync from the client (sent on startup)
+                if (test === "ignore") {
+                    if (result && result.trim()) {
+                        result.split(",").forEach(name => {
+                            name = name.trim().toLowerCase();
+                            if (name) {
+                                dev.ignored.add(name);   // Set deduplicates automatically
+                                dev.allTests.add(name);  // ensure it appears in edit mode
+                            }
+                        });
+                    }
+                    if (!dev.editing) renderCard(hostname);
+                    return;
+                }
+
+                dev.allTests.add(test);
+                dev.stats[test] = result;
+                if (!dev.editing) renderCard(hostname);
+            },
+            objects(event) {
+                // App Context membership events for availability_monitor
+                const msg = event.message;
+                if (msg.type !== "membership") return;
+                const hostname = msg.data.uuid.id;
+
+                if (msg.event === "set") {
+                    if (!devices[hostname]) {
+                        devices[hostname] = { stats: {}, lastSeen: null, ignored: new Set(), allTests: new Set(), editing: false, expanded: false };
+                        renderCard(hostname);
+                        pubnub.subscribe({ channels: [hostname] });
+                        updateBadge();
+                    }
+                } else if (msg.event === "delete") {
+                    // Card stays visible and will naturally show OFFLINE
+                }
+            },
+            status(event) {
+                if (event.category === "PNConnectedCategory") {
+                    updateBadge();
+                }
+            }
+        });
+
+        // Subscribe to device channels + MONITOR_CHANNEL (needed to receive Objects events)
+        pubnub.subscribe({ channels: [...members, MONITOR_CHANNEL] });
+    }
+
+    init().catch(err => {
+        document.getElementById("status-badge").textContent = "Error: " + err.message;
+        console.error(err);
+    });
+
+    // Refresh online/offline status every 5 s
+    setInterval(renderAll, 5000);
+
+    // ── Script upload ─────────────────────────────────────────────────────────
+
+    document.getElementById("file-input").addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const statusEl = document.getElementById("upload-status");
+        statusEl.className = "";
+        statusEl.textContent = `Uploading ${file.name}…`;
+
+        try {
+            const res = await fetch("/api/upload-script", {
+                method: "POST",
+                headers: {
+                    "X-Filename": file.name,
+                    "Content-Type": "application/octet-stream"
+                },
+                body: file
+            });
+            const data = await res.json();
+            if (data.ok) {
+                statusEl.className = "success";
+                statusEl.textContent = `✓ ${file.name} uploaded`;
+            } else {
+                statusEl.className = "error";
+                statusEl.textContent = `Error: ${data.error}`;
+            }
+        } catch (err) {
+            statusEl.className = "error";
+            statusEl.textContent = `Error: ${err.message}`;
+        }
+
+        e.target.value = "";
+    });
+</script>
+</body>
+</html>
