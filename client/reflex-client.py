@@ -98,7 +98,7 @@ def load_config():
     with open(config_path) as f:
         config.read_string("[settings]\n" + f.read())
     section = config["settings"]
-    return (section["host"], section["pub"], section["sub"],
+    return (section["pub"], section["sub"],
             section["scripts"], section["config_chan"],
             section["ignore_chan"], section.get("ignore_list", ""))
 
@@ -140,8 +140,8 @@ def sync_scripts(pubnub, scripts_dir, config_chan):
         except Exception as e:
             print(f"  Download error ({name}): {e}")
 
-def run_client_scripts(pubnub, hostname):
-    scripts_dir = Path(__file__).parent / "client-scripts"
+def run_client_scripts(pubnub, hostname, scripts):
+    scripts_dir = Path(__file__).parent / scripts
     with ignore_lock:
         current_ignore = set(ignore_set)
     for script in sorted(scripts_dir.glob("*.py")):
@@ -192,7 +192,7 @@ def main():
     parser.add_argument('--name', help="Override the default hostname")
     args = parser.parse_args()
 
-    host, pub, sub, scripts, config_chan, ignore_chan, ignore_list = load_config()
+    pub, sub, scripts, config_chan, ignore_chan, ignore_list = load_config()
     hostname = args.name if args.name else socket.gethostname()
 
     pnconfig = PNConfiguration()
@@ -244,7 +244,7 @@ def main():
 
         try:
             while True:
-                run_client_scripts(pubnub, hostname)
+                run_client_scripts(pubnub, hostname, scripts)
                 #pubnub.publish().channel(channel).message({
                 #    "type": "heartbeat", "id": hostname
                 #}).sync()
