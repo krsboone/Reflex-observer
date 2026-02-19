@@ -51,19 +51,25 @@ with your pub/sub keys
 **Messages**
 
 `config_chan` & `ignore_chan` -->(Subscribe) monitor client (Publish)--> device channel
+
 device channel(s) -->(Subscribe) browser client (Publish)--> `ignore_chan`
 
 **Files**
 
 local file picker -->(Select) browser client (POST)--> `api/upload-script`
+
 `api/upload-script` -->(Fetch) webserver (Save)--> `scripts` dir
+
 uploaded files -->(List) webserver (send_file)--> `config_chan`
 
 **Memberships**
 
 statup arguments (join/exit) -->(Parse) monitor client (set/remove)--> `channel` Channel membership
+
 `/api/members` -->(GET) browser client (createElement)--> Create device card
+
 list `channel` members -->(get_channel_members) webserver (respond)--> `/api/members`
+
 membership events -->(Listen) browser client (createElement)--> Create device card
 
 
