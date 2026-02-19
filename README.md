@@ -12,6 +12,7 @@ Enable the following for the given keyset:
 4. File Sharing
 
 **Server**
+
 `dashboard.py` (webserver)
 * Runs a webserver (http://localhost:8080)
 * Reads config, passes values to the browser client (`dashboard.html`)
@@ -28,6 +29,7 @@ Enable the following for the given keyset:
 * Ability to refresh the list of scripts being ignored by each device | Publish command to the `ignore_chan` channel
 
 **Client**
+
 `reflex-client.py` (monitor client)
 * Reads config
 * Subscribes to `config_chan` | used for receiving test files that the monitor client should run
