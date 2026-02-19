@@ -59,7 +59,7 @@ The following are all packages used by the python scripts:
 *Client*
 `sys, os, socket, time, subprocess, configparser, argparse, threading, pathlib, psutil, pubnub`
 
-[PubNub](https://www.pubnub.com) is requied on all systems, and a core service providing functionality at all layers. For additional details, please revuew the [python sdk docs](https://www.pubnub.com/docs/sdks/python)
+[PubNub](https://www.pubnub.com) is requied on all systems, and a core service providing functionality at all layers. For additional details, please review the [python sdk docs](https://www.pubnub.com/docs/sdks/python)
 
 
 ## Flow
