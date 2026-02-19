@@ -49,6 +49,19 @@ sub = sub-key-here
 ```
 with your pub/sub keys
 
+**Python**
+
+The following are all packages used by the python scripts:
+
+*Server*
+`io, json, configparser, pathlib, http.server, urllib.parse, pubnub`
+
+*Client*
+`sys, os, socket, time, subprocess, configparser, argparse, threading, pathlib, psutil, pubnub`
+
+[PubNub](https://www.pubnub.com) is requied on all systems, and a core service providing functionality at all layers. For additional details, please revuew the [python sdk docs](https://www.pubnub.com/docs/sdks/python)
+
+
 ## Flow
 **Messages**
 
@@ -67,6 +80,17 @@ with your pub/sub keys
 * `/api/members` -->(GET) browser client (createElement)--> Create device card
 * list `channel` members -->(get_channel_members) webserver (respond)--> `/api/members`
 * membership events -->(Listen) browser client (createElement)--> Create device card
+
+
+## Install
+
+
+
+## Running
+
+**Server**
+
+
 
 
 ## Todo
