@@ -1,7 +1,7 @@
 # Reflex-observer
 
 
-** This doc is a work in progress**
+** This doc is a work in progress **
 
 
 ## Details
