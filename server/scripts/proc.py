@@ -4,10 +4,7 @@ import psutil
 proc_name = ['npm exec @pubnub/mcp@latest', '', '', '']
 
 def get_proc(proc_name):
-    #for proc in psutil.process_iter(['pid', 'name', 'username']):
     for proc in psutil.process_iter(['cmdline']):
-        #print(proc.info)
-        #print(proc.name)
         if proc.info['cmdline'] == proc_name:
             return True
     return False

@@ -3,10 +3,7 @@ import psutil
 proc_name = 'node'
 
 def get_proc(proc_name):
-    #for proc in psutil.process_iter(['pid', 'name', 'username']):
     for proc in psutil.process_iter(['name']):
-        #print(proc.info)
-        #print(proc.name)
         if proc.info['name'] == proc_name:
             return True
     return False
