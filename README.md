@@ -105,3 +105,5 @@ The following are all packages used by the python scripts:
 6. Consideration for File Sharing retention period. If server is running continuously, will need to resend the files, or rerun the list_files & compare flow periodically
 7. Change device channel naming convention to device.($hostname} so wildcard subscribe can be used on the server
 8. `channel` var to config file
+9. Add ability to issue test file updates
+10. Add ability to delete a test file
