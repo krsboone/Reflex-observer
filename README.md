@@ -107,3 +107,4 @@ The following are all packages used by the python scripts:
 8. `channel` var to config file
 9. Add ability to issue test file updates
 10. Add ability to delete a test file
+11. Bring ignore_list to user meta data, eliminating from client config file
