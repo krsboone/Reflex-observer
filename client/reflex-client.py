@@ -16,29 +16,13 @@ ignore_set  = set()
 ignore_lock = threading.Lock()
 
 
-def update_config_ignore_list(config_path, ignore_str):
-    """Persist the new ignore_list value back to config/config.ini."""
-    lines = config_path.read_text().splitlines()
-    updated = []
-    found = False
-    for line in lines:
-        if line.strip().startswith("ignore_list"):
-            updated.append(f"ignore_list = {ignore_str}")
-            found = True
-        else:
-            updated.append(line)
-    if not found:
-        updated.append(f"ignore_list = {ignore_str}")
-    config_path.write_text("\n".join(updated) + "\n")
-
 
 class IgnoreListener(SubscribeCallback):
     """Listens on ignore_chan and updates the local ignore_set.
     Only acts on messages whose 'host' matches this device's hostname.
     """
-    def __init__(self, hostname, config_path):
-        self._hostname  = hostname
-        self._config_path = config_path
+    def __init__(self, hostname):
+        self._hostname = hostname
 
     def message(self, pubnub, event):
         msg = event.message
@@ -65,8 +49,6 @@ class IgnoreListener(SubscribeCallback):
                     ignore_set.add(name)
         active = sorted(ignore_set) or "none"
         print(f"  Ignore list updated: {active}")
-        # Persist to config.ini so the list survives restarts
-        update_config_ignore_list(self._config_path, ignore_str)
 
     def status(self, pubnub, event):
         pass
@@ -100,7 +82,7 @@ def load_config():
     section = config["settings"]
     return (section["pub"], section["sub"],
             section["scripts"], section["config_chan"],
-            section["ignore_chan"], section.get("ignore_list", ""))
+            section["ignore_chan"])
 
 def sync_scripts(pubnub, scripts_dir, config_chan):
     """
@@ -192,7 +174,7 @@ def main():
     parser.add_argument('--name', help="Override the default hostname")
     args = parser.parse_args()
 
-    pub, sub, scripts, config_chan, ignore_chan, ignore_list = load_config()
+    pub, sub, scripts, config_chan, ignore_chan = load_config()
     hostname = args.name if args.name else socket.gethostname()
 
     pnconfig = PNConfiguration()
@@ -201,15 +183,25 @@ def main():
     pnconfig.user_id = hostname
     pubnub = PubNub(pnconfig)
 
-    # Seed ignore_set from config.ini ignore_list
-    for name in ignore_list.split(","):
-        name = name.strip().upper()
-        if name:
-            ignore_set.add(name)
+    # Seed ignore_set from UUID metadata (App Context)
+    try:
+        envelope = pubnub.get_uuid_metadata(uuid=hostname, include_custom=True).sync()
+        if envelope and envelope.result and envelope.result.data:
+            custom = envelope.result.data.get("custom") or {}
+            ignore_str = custom.get("ignore", "")
+            for name in ignore_str.split(","):
+                name = name.strip().upper()
+                if name:
+                    ignore_set.add(name)
+        print(f"  Loaded ignore list from metadata: {sorted(ignore_set) or 'none'}")
+    except Exception as e:
+        if "404" in str(e):
+            print("  No ignore list configured yet.")
+        else:
+            print(f"  Could not load ignore list from metadata: {e}")
 
     # Subscribe to ignore channel to receive live deactivation messages
-    config_path = Path(__file__).parent / "client-config" / "config.ini"
-    pubnub.add_listener(IgnoreListener(hostname, config_path))
+    pubnub.add_listener(IgnoreListener(hostname))
     pubnub.subscribe().channels([ignore_chan]).execute()
 
     scripts_dir = Path(__file__).parent / scripts.rstrip("/")

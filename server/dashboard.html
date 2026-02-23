@@ -501,6 +501,20 @@
         const dev = devices[hostname];
         const ignoreStr = Array.from(dev.ignored).map(t => t.toUpperCase()).join(", ");
         try {
+            await pubnub.objects.setUUIDMetadata({
+                uuid: hostname,
+                data: {
+                    name: hostname,
+                    email: hostname,
+                    custom: {
+                        ignore: ignoreStr
+                    }
+                }
+            });
+        } catch (e) {
+            console.error("setUUIDMetadata error:", e);
+        }
+        try {
             await pubnub.publish({
                 channel: IGNORE_CHAN,
                 message: { host: hostname, ignore: ignoreStr }
