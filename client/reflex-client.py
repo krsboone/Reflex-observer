@@ -11,6 +11,22 @@ from pubnub.pnconfiguration import PNConfiguration
 from pubnub.pubnub import PubNub
 from pubnub.callbacks import SubscribeCallback
 
+# SDK bug fix: PNSubscriptionRegistryCallback.file() calls listener.file_message()
+# but PubNubSubscription never defines that method, crashing the SubscribeMessageWorker
+# thread on every file event. This patch bridges file_message → on_file so the
+# crash is eliminated and the on_file attribute becomes functional.
+from pubnub.models.subscription import PubNubSubscription as _PubNubSubscription
+from pubnub.models.subscription import PubNubSubscriptionSet as _PubNubSubscriptionSet
+
+def _file_message_bridge(self, event):
+    cb = getattr(self, 'on_file', None)
+    if callable(cb):
+        cb(event)
+
+for _cls in (_PubNubSubscription, _PubNubSubscriptionSet):
+    if not hasattr(_cls, 'file_message'):
+        _cls.file_message = _file_message_bridge
+
 # Tracks which script stems (uppercase) should be skipped
 ignore_set  = set()
 ignore_lock = threading.Lock()
@@ -63,6 +79,42 @@ class IgnoreListener(SubscribeCallback):
 # {'host":"test1-us-east-1", "ignore":"NODE, PROC, PYTH"}
 # Refresh payload (channel = IGNORE_CHAN):
 # {'host":"test1-us-east-1", "command":"refresh"}
+
+class ScriptFileListener(SubscribeCallback):
+    """Listens on config_chan for new script file uploads and downloads them."""
+    def __init__(self, config_chan, scripts_dir):
+        self._config_chan = config_chan
+        self._scripts_dir = scripts_dir
+
+    def file(self, pubnub, event):
+        # PNFileMessageResult has flat attributes: file_name, file_id, file_url
+        try:
+            file_name = event.file_name
+            file_id   = event.file_id
+        except AttributeError:
+            return
+        if not file_name.endswith(".py"):
+            return
+        try:
+            dl = pubnub.download_file() \
+                .channel(self._config_chan) \
+                .file_name(file_name) \
+                .file_id(file_id) \
+                .sync()
+            (self._scripts_dir / file_name).write_bytes(dl.result.data)
+            print(f"  New script downloaded: {file_name}")
+        except Exception as e:
+            print(f"  Script download error ({file_name}): {e}")
+
+    def message(self, _pubnub, _event):
+        pass
+
+    def status(self, _pubnub, _event):
+        pass
+
+    def presence(self, _pubnub, _event):
+        pass
+
 
 class MemberWrapper:
     def __init__(self, id_val):
@@ -200,11 +252,12 @@ def main():
         else:
             print(f"  Could not load ignore list from metadata: {e}")
 
-    # Subscribe to ignore channel to receive live deactivation messages
-    pubnub.add_listener(IgnoreListener(hostname))
-    pubnub.subscribe().channels([ignore_chan]).execute()
-
     scripts_dir = Path(__file__).parent / scripts.rstrip("/")
+
+    # Subscribe to ignore and config channels for live updates
+    pubnub.add_listener(IgnoreListener(hostname))
+    pubnub.add_listener(ScriptFileListener(config_chan, scripts_dir))
+    pubnub.subscribe().channels([ignore_chan, config_chan]).execute()
     sync_scripts(pubnub, scripts_dir, config_chan)
 
     channel = "availability_monitor"
@@ -237,10 +290,6 @@ def main():
         try:
             while True:
                 run_client_scripts(pubnub, hostname, scripts)
-                #pubnub.publish().channel(channel).message({
-                #    "type": "heartbeat", "id": hostname
-                #}).sync()
-                #print(f"Heartbeat sent [{time.strftime('%H:%M:%S')}]", end="\r")
                 time.sleep(2)
         except KeyboardInterrupt:
             print("\nMonitoring paused.")
