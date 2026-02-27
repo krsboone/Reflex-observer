@@ -109,3 +109,4 @@ The following are all packages used by the python scripts:
 10. Add ability to delete a test file
 11. ~~Bring ignore_list to user meta data, eliminating reads/writes from client config file~~
 12. Check for and replace invalid chars from hostname | example: s/host.name.1/host-name-1/g
+13. Ability to create device groups for visual presentation, and test assignment
