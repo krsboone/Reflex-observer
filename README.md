@@ -79,7 +79,7 @@ The following are all packages used by the python scripts:
 
 **Memberships**
 
-* statup arguments (join/exit) -->(Parse) monitor client (set/remove)--> `channel` Channel membership
+* startup arguments (join/exit) -->(Parse) monitor client (set/remove)--> `channel` Channel membership
 * `/api/members` -->(GET) browser client (createElement)--> Create device card
 * list `channel` members -->(get_channel_members) webserver (respond)--> `/api/members`
 * membership events -->(Listen) browser client (createElement)--> Create device card
